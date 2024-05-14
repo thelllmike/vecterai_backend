@@ -1,11 +1,21 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 import vtracer
-from PIL import Image
 import io
 import os
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 @app.post("/upload/")
 async def upload_image(file: UploadFile = File(...)):
@@ -16,12 +26,15 @@ async def upload_image(file: UploadFile = File(...)):
     try:
         # Convert image from bytes and get SVG string
         svg_string = convert_image_from_bytes(image_bytes, file.filename.split('.')[-1])
+        if not svg_string:
+            raise ValueError("SVG conversion failed")
+        
         svg_filename = f"{file.filename}.svg"
         with open(svg_filename, "w") as svg_file:
-            svg_file.write(svg_string if svg_string else "")
+            svg_file.write(svg_string)
         return FileResponse(path=svg_filename, filename=svg_filename, media_type='image/svg+xml')
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"An error occurred while processing the image: {str(e)}")
 
 def convert_image_from_bytes(input_bytes, img_format):
     """Converts image from raw bytes to SVG string."""
